@@ -1,0 +1,155 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "rapid_wakeup": {
+        "default": "mdi:alarm-off",
+        "state": {
+          "on": "mdi:alarm"
+        }
+      },
+      "goal_met_today": {
+        "default": "mdi:trophy-outline",
+        "state": {
+          "on": "mdi:trophy"
+        }
+      }
+    },
+    "device_tracker": {
+      "location": {
+        "default": "mdi:dog"
+      }
+    },
+    "select": {
+      "gps_mode": {
+        "default": "mdi:map-marker-radius",
+        "state": {
+          "economy": "mdi:leaf",
+          "standard": "mdi:map-marker-radius",
+          "urgent": "mdi:map-marker-alert"
+        }
+      }
+    },
+    "sensor": {
+      "exercise_today": {
+        "default": "mdi:run"
+      },
+      "pottering_today": {
+        "default": "mdi:walk"
+      },
+      "resting_today": {
+        "default": "mdi:sleep"
+      },
+      "exercise_yesterday": {
+        "default": "mdi:run"
+      },
+      "goal_progress": {
+        "default": "mdi:target"
+      },
+      "goals_met_this_month": {
+        "default": "mdi:calendar-check"
+      },
+      "daily_goal": {
+        "default": "mdi:flag-checkered"
+      },
+      "network_quality": {
+        "default": "mdi:network-strength-off-outline",
+        "state": {
+          "pending": "mdi:timer-sand",
+          "minimal": "mdi:network-strength-outline",
+          "poor": "mdi:network-strength-1",
+          "fair": "mdi:network-strength-2",
+          "good": "mdi:network-strength-3",
+          "great": "mdi:network-strength-4"
+        }
+      },
+      "network_protocol": {
+        "default": "mdi:radio-tower"
+      },
+      "tracking_status": {
+        "default": "mdi:crosshairs-gps",
+        "state": {
+          "idle": "mdi:crosshairs-off",
+          "waiting_for_contact": "mdi:timer-sand",
+          "waiting_for_satellites": "mdi:satellite-variant"
+        }
+      },
+      "tracking_mode": {
+        "default": "mdi:crosshairs-gps",
+        "state": {
+          "off": "mdi:crosshairs-off",
+          "walk": "mdi:dog-side"
+        }
+      },
+      "walking_today": {
+        "default": "mdi:walk"
+      },
+      "running_today": {
+        "default": "mdi:run-fast"
+      },
+      "playing_today": {
+        "default": "mdi:tennis-ball"
+      },
+      "steps_today": {
+        "default": "mdi:paw"
+      },
+      "total_steps": {
+        "default": "mdi:paw"
+      },
+      "total_distance": {
+        "default": "mdi:map-marker-distance"
+      },
+      "calories_today": {
+        "default": "mdi:fire"
+      },
+      "distance_today": {
+        "default": "mdi:map-marker-distance"
+      },
+      "geocoded_location": {
+        "default": "mdi:home-map-marker"
+      },
+      "location_time": {
+        "default": "mdi:map-marker-check"
+      },
+      "location_accuracy": {
+        "default": "mdi:crosshairs-question"
+      },
+      "activity_data_until": {
+        "default": "mdi:clock-check-outline"
+      },
+      "walks_today": {
+        "default": "mdi:dog-side"
+      },
+      "last_walk": {
+        "default": "mdi:map-marker-path"
+      },
+      "signal_strength": {
+        "default": "mdi:signal"
+      },
+      "network_operator": {
+        "default": "mdi:sim"
+      }
+    },
+    "button": {
+      "start_live_tracking": {
+        "default": "mdi:crosshairs-gps"
+      },
+      "start_walk": {
+        "default": "mdi:dog-side"
+      },
+      "stop_live_tracking": {
+        "default": "mdi:stop-circle-outline"
+      },
+      "wake_up": {
+        "default": "mdi:refresh"
+      }
+    },
+    "switch": {
+      "background_tracking": {
+        "default": "mdi:map-marker-off",
+        "state": {
+          "on": "mdi:map-marker"
+        }
+      }
+    }
+  }
+}

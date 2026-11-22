@@ -1,0 +1,193 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in to PitPat",
+        "description": "Use the email and password you use in the PitPat app. Your password is only used to sign in and is not stored.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to PitPat again",
+        "description": "Your PitPat session for {email} has expired. Enter your password to sign in again.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Sign-in failed. Check your email and password. After several failed attempts PitPat locks sign-in for 10 minutes.",
+      "cannot_connect": "Could not connect to PitPat. Try again later."
+    },
+    "abort": {
+      "already_configured": "This PitPat account is already set up.",
+      "reauth_successful": "Signed in to PitPat again.",
+      "wrong_account": "That is a different PitPat account from the one originally set up."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "goal_met_today": {
+        "name": "Exercise goal met today",
+        "state": {
+          "on": "Yes",
+          "off": "No"
+        }
+      },
+      "lost_contact": {
+        "name": "Lost contact"
+      },
+      "rapid_wakeup": {
+        "name": "Rapid wake-up"
+      },
+      "needs_charging": {
+        "name": "Needs charging"
+      }
+    },
+    "select": {
+      "gps_mode": {
+        "name": "GPS mode",
+        "state": {
+          "economy": "Economy",
+          "standard": "Standard",
+          "urgent": "Urgent"
+        }
+      }
+    },
+    "sensor": {
+      "weight": {
+        "name": "Weight"
+      },
+      "daily_goal": {
+        "name": "Daily exercise goal"
+      },
+      "exercise_today": {
+        "name": "Exercise today"
+      },
+      "pottering_today": {
+        "name": "Pottering today"
+      },
+      "resting_today": {
+        "name": "Resting today"
+      },
+      "walking_today": {
+        "name": "Walking today"
+      },
+      "running_today": {
+        "name": "Running today"
+      },
+      "playing_today": {
+        "name": "Playing today"
+      },
+      "steps_today": {
+        "name": "Steps today"
+      },
+      "distance_today": {
+        "name": "Distance today"
+      },
+      "calories_today": {
+        "name": "Calories today"
+      },
+      "total_steps": {
+        "name": "Total steps"
+      },
+      "total_distance": {
+        "name": "Total distance"
+      },
+      "activity_data_until": {
+        "name": "Activity data up to"
+      },
+      "goal_progress": {
+        "name": "Exercise goal progress"
+      },
+      "exercise_yesterday": {
+        "name": "Exercise yesterday"
+      },
+      "goals_met_this_month": {
+        "name": "Exercise goals met this month"
+      },
+      "last_activity": {
+        "name": "Last activity"
+      },
+      "last_sync": {
+        "name": "Last sync"
+      },
+      "next_contact": {
+        "name": "Next expected contact"
+      },
+      "location_time": {
+        "name": "Last location fix"
+      },
+      "location_accuracy": {
+        "name": "Location accuracy"
+      },
+      "geocoded_location": {
+        "name": "Geocoded location"
+      },
+      "tracking_mode": {
+        "name": "Tracking mode",
+        "state": {
+          "off": "Off",
+          "live_tracking": "Live tracking",
+          "walk": "Walk"
+        }
+      },
+      "tracking_status": {
+        "name": "Tracking status",
+        "state": {
+          "idle": "Idle",
+          "waiting_for_contact": "Waiting for next contact",
+          "waiting_for_satellites": "Listening to satellites",
+          "tracking": "Live tracking"
+        }
+      },
+      "signal_strength": {
+        "name": "Signal strength"
+      },
+      "network_quality": {
+        "name": "Network quality",
+        "state": {
+          "pending": "Pending",
+          "minimal": "Minimal",
+          "poor": "Poor",
+          "fair": "Fair",
+          "good": "Good",
+          "great": "Great"
+        }
+      },
+      "network_operator": {
+        "name": "Network operator"
+      },
+      "network_protocol": {
+        "name": "Network type"
+      },
+      "walks_today": {
+        "name": "Walks today"
+      },
+      "last_walk": {
+        "name": "Last walk"
+      }
+    },
+    "button": {
+      "start_live_tracking": {
+        "name": "Start live tracking"
+      },
+      "start_walk": {
+        "name": "Start a walk"
+      },
+      "stop_live_tracking": {
+        "name": "Stop live tracking"
+      },
+      "wake_up": {
+        "name": "Request update"
+      }
+    },
+    "switch": {
+      "background_tracking": {
+        "name": "Background tracking"
+      }
+    }
+  }
+}
