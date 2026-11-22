@@ -1,5 +1,5 @@
 {
-  "domain": "pitpat",
+  "domain": "ha_pitpat",
   "name": "PitPat",
   "codeowners": ["@photomoose"],
   "config_flow": true,

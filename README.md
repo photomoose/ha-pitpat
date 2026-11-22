@@ -18,7 +18,7 @@ Then go to **Settings → Devices & services → Add integration** and search fo
 
 ### Manually
 
-1. Copy `custom_components/pitpat` into the `custom_components` folder of your Home Assistant configuration directory (the folder that holds `configuration.yaml`).
+1. Copy `custom_components/ha_pitpat` into the `custom_components` folder of your Home Assistant configuration directory (the folder that holds `configuration.yaml`).
 2. Restart Home Assistant.
 3. Go to **Settings → Devices & services → Add integration** and search for **PitPat**.
 

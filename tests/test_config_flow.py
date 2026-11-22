@@ -6,8 +6,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.pitpat.auth import PitPatAuthError, PitPatConnectionError
-from custom_components.pitpat.const import CONF_REFRESH_TOKEN, CONF_USER_ID, DOMAIN
+from custom_components.ha_pitpat.auth import PitPatAuthError, PitPatConnectionError
+from custom_components.ha_pitpat.const import CONF_REFRESH_TOKEN, CONF_USER_ID, DOMAIN
 
 from .conftest import USER_ID
 

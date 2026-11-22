@@ -16,7 +16,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.pitpat.const import (
+from custom_components.ha_pitpat.const import (
     API_BASE_URL,
     CONF_REFRESH_TOKEN,
     CONF_USER_ID,
@@ -26,15 +26,15 @@ from custom_components.pitpat.const import (
 
 from freezegun.api import FrozenDateTimeFactory
 
-from custom_components.pitpat.const import ACTIVITY_BASE_URL, LOCATION_BASE_URL
-from custom_components.pitpat.binary_sensor import BINARY_SENSORS
-from custom_components.pitpat.coordinator import (
+from custom_components.ha_pitpat.const import ACTIVITY_BASE_URL, LOCATION_BASE_URL
+from custom_components.ha_pitpat.binary_sensor import BINARY_SENSORS
+from custom_components.ha_pitpat.coordinator import (
     KEEP_ALIVE_LIMIT,
     LIVE_START_GRACE,
     WAKE_UP_POLL,
 )
-from custom_components.pitpat.geocode import NOMINATIM_URL
-from custom_components.pitpat.sensor import SENSORS
+from custom_components.ha_pitpat.geocode import NOMINATIM_URL
+from custom_components.ha_pitpat.sensor import SENSORS
 
 from .conftest import (
     ACTIVITY_RESPONSE,
@@ -946,36 +946,6 @@ async def test_tracking_button_error(
     with pytest.raises(HomeAssistantError, match="Could not start a walk"):
         await _press(hass, "button.rex_start_a_walk")
     assert entry.runtime_data.update_interval.total_seconds() == 300
-
-
-async def test_replaced_entities_removed(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
-    """Replaced entities are removed from the registry; others are kept."""
-    _mock_endpoints(aioclient_mock, _monitor(0))
-    entry = _entry(hass)
-    registry = er.async_get(hass)
-    for key in ("walk", "live_tracking", "background_tracking"):
-        registry.async_get_or_create(
-            "switch", DOMAIN, f"{DOG_ID}_{key}", config_entry=entry
-        )
-    registry.async_get_or_create(
-        "sensor", DOMAIN, f"{DOG_ID}_live_tracking_reason", config_entry=entry
-    )
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    switches = {
-        entity.unique_id
-        for entity in er.async_entries_for_config_entry(registry, entry.entry_id)
-        if entity.domain == "switch"
-    }
-    assert f"{DOG_ID}_walk" not in switches
-    assert f"{DOG_ID}_live_tracking" not in switches
-    assert f"{DOG_ID}_background_tracking" in switches
-    assert not registry.async_get_entity_id(
-        "sensor", DOMAIN, f"{DOG_ID}_live_tracking_reason"
-    )
 
 
 async def test_entity_categories(

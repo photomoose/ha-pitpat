@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from custom_components.pitpat.auth import TokenSet
+from custom_components.ha_pitpat.auth import TokenSet
 
 USER_ID = "d1f49674-a6f4-4719-80e9-e87ccdda1507"
 DOG_ID = "1678dc30-823f-48ed-a890-0840ed6e63f2"
@@ -154,7 +154,7 @@ def make_tokens(refresh_token: str = "refresh-1") -> TokenSet:
 @pytest.fixture
 def mock_login():
     with patch(
-        "custom_components.pitpat.config_flow.async_login",
+        "custom_components.ha_pitpat.config_flow.async_login",
         AsyncMock(return_value=make_tokens()),
     ) as mock:
         yield mock
@@ -165,15 +165,15 @@ def mock_api():
     """Patch the API client methods used by the flow and coordinator."""
     with (
         patch(
-            "custom_components.pitpat.api.PitPatApiClient.async_get_settings",
+            "custom_components.ha_pitpat.api.PitPatApiClient.async_get_settings",
             AsyncMock(return_value={"UserId": USER_ID, "UserDogTotal": "1"}),
         ) as settings,
         patch(
-            "custom_components.pitpat.api.PitPatApiClient.async_get_dogs",
+            "custom_components.ha_pitpat.api.PitPatApiClient.async_get_dogs",
             AsyncMock(return_value=[DOG]),
         ) as dogs,
         patch(
-            "custom_components.pitpat.api.async_refresh",
+            "custom_components.ha_pitpat.api.async_refresh",
             AsyncMock(return_value=make_tokens("refresh-2")),
         ) as refresh,
     ):
@@ -215,8 +215,8 @@ class FakeLive:
 @pytest.fixture(autouse=True)
 def no_geocode_spacing():
     with (
-        patch("custom_components.pitpat.geocode.MIN_INTERVAL", 0),
-        patch("custom_components.pitpat.geocode._last_request", 0.0),
+        patch("custom_components.ha_pitpat.geocode.MIN_INTERVAL", 0),
+        patch("custom_components.ha_pitpat.geocode._last_request", 0.0),
     ):
         yield
 
@@ -225,7 +225,7 @@ def no_geocode_spacing():
 def mock_live():
     live = FakeLive()
     with patch(
-        "custom_components.pitpat.coordinator.PitPatLiveConnection",
+        "custom_components.ha_pitpat.coordinator.PitPatLiveConnection",
         lambda *args: FakeLiveConnection(live, *args),
     ):
         yield live

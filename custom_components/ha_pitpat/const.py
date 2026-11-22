@@ -1,6 +1,6 @@
 """Constants for the PitPat integration."""
 
-DOMAIN = "pitpat"
+DOMAIN = "ha_pitpat"
 
 AUTH_BASE_URL = "https://auth.pitpat.com"
 AUTHORIZE_URL = f"{AUTH_BASE_URL}/connect/authorize"

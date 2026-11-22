@@ -9,9 +9,9 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
-from custom_components.pitpat import live
-from custom_components.pitpat.auth import PitPatConnectionError
-from custom_components.pitpat.live import RECORD_SEPARATOR, PitPatLiveConnection
+from custom_components.ha_pitpat import live
+from custom_components.ha_pitpat.auth import PitPatConnectionError
+from custom_components.ha_pitpat.live import RECORD_SEPARATOR, PitPatLiveConnection
 
 from .conftest import DOG_ID, MONITOR_RESPONSE, USER_ID
 

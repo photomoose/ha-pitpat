@@ -17,7 +17,7 @@ from pathlib import Path
 
 # Register the package without running its __init__ (which needs Home Assistant).
 _pkg = types.ModuleType("pitpat")
-_pkg.__path__ = [str(Path(__file__).resolve().parents[1] / "custom_components" / "pitpat")]
+_pkg.__path__ = [str(Path(__file__).resolve().parents[1] / "custom_components" / "ha_pitpat")]
 sys.modules["pitpat"] = _pkg
 
 import aiohttp  # noqa: E402

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PitPatApiClient
@@ -41,26 +40,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PitPatConfigEntry) -> bo
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
-    _async_remove_old_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
-
-
-# Entities since replaced: the Walk and Live tracking switches by buttons and
-# the Tracking mode sensor, and the raw Live tracking reason by Tracking mode.
-# The keep-alive switch is gone as keepAlives are now sent when needed.
-REMOVED_ENTITIES = {
-    Platform.SWITCH: ("_walk", "_live_tracking", "_keep_alive"),
-    Platform.SENSOR: ("_live_tracking_reason",),
-}
-
-
-def _async_remove_old_entities(hass: HomeAssistant, entry: PitPatConfigEntry) -> None:
-    registry = er.async_get(hass)
-    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
-        suffixes = REMOVED_ENTITIES.get(entity.domain, ())
-        if entity.unique_id.endswith(suffixes):
-            registry.async_remove(entity.entity_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PitPatConfigEntry) -> bool:
