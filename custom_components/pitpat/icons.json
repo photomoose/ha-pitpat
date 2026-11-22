@@ -123,7 +123,14 @@
         "default": "mdi:map-marker-path"
       },
       "signal_strength": {
-        "default": "mdi:signal"
+        "default": "mdi:signal",
+        "range": {
+          "0": "mdi:network-strength-outline",
+          "1": "mdi:network-strength-1",
+          "2": "mdi:network-strength-2",
+          "3": "mdi:network-strength-3",
+          "4": "mdi:network-strength-4"
+        }
       },
       "network_operator": {
         "default": "mdi:sim"

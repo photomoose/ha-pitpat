@@ -64,7 +64,7 @@ One device per dog (named after the dog), with:
 | Tracking status | Progress of a walk or live tracking, as the app shows it: Idle, Waiting for next contact (the collar hasn't picked up the request yet), Listening to satellites (it has, and is getting a GPS fix) or Live tracking (fixes are coming in) |
 | Lost contact | On when PitPat has lost contact with the collar (diagnostic) |
 | Network quality | Mobile signal quality as the app names it: Minimal, Poor, Fair, Good or Great, or Pending until the collar reports it (diagnostic) |
-| Signal strength | Raw value reported by the collar; its scale is unknown and the app doesn't show it (diagnostic, disabled by default) |
+| Signal strength | 0 to 4, like the bars on a phone. The app doesn't show it, and it doesn't follow Network quality, so it probably measures something else, such as raw signal level (diagnostic, disabled by default) |
 | Network operator | Mobile network the collar uses (diagnostic, disabled by default) |
 | Network type | Mobile network technology: LTE-M or NB-IoT (diagnostic, disabled by default) |
 | Rapid wake-up | Shown as "[+]" after the network type in the app. Probably whether PitPat can wake the collar straight away on its current connection, rather than at its next check-in (diagnostic, disabled by default) |
@@ -74,6 +74,23 @@ Data is refreshed every 5 minutes; collars report in roughly every 20 minutes. S
 PitPat ends a walk by itself after three hours. Live tracking to find the dog ends 10 minutes after the last "keep-alive", which the app sends every 30 seconds while its map is open. Home Assistant sends them for live tracking it started (not for tracking started in the app), until tracking is stopped or for at most three hours.
 
 Starting a walk or live tracking wakes the collar, which can take a few minutes (longer in Economy GPS mode, less in Urgent); the integration polls quickly for up to 10 minutes while it waits. Tracking status shows how far it has got. Live tracking uses a lot of collar battery, so if you put the start buttons on a dashboard, consider adding a tap confirmation to the card.
+
+## Screenshots
+
+The device page for a dog:
+
+<table>
+  <tr>
+    <td valign="top" width="50%">
+      <img src="docs/images/device-controls.png" alt="Controls: Request update, Start a walk, Start live tracking and Stop live tracking buttons">
+      <img src="docs/images/device-configuration.png" alt="Configuration: Background tracking switch and GPS mode select">
+      <img src="docs/images/device-diagnostic.png" alt="Diagnostic: tracker, last sync, lost contact, network and signal details">
+    </td>
+    <td valign="top" width="50%">
+      <img src="docs/images/device-sensors.png" alt="Sensors: battery, activity, steps, distance, location, walks, tracking and weight">
+    </td>
+  </tr>
+</table>
 
 ## Notes
 

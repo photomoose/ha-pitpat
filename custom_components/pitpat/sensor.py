@@ -402,7 +402,7 @@ SENSORS: tuple[PitPatSensorDescription, ...] = (
         options=list(TRACKING_STATES.values()),
         value_fn=_tracking_status,
     ),
-    # The scale of this one is unknown, and the app never shows it.
+    # 0 to 4, like signal bars. The app never shows it.
     PitPatSensorDescription(
         key="signal_strength",
         translation_key="signal_strength",
