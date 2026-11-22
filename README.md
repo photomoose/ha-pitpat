@@ -2,7 +2,7 @@
 
 A custom integration that brings your PitPat dog activity monitor data into Home Assistant.
 
-> This is an unofficial project. It is not affiliated with, endorsed by or supported by PitPat. It uses PitPat's private app API, which may change or stop working at any time.
+> This is an unofficial project. It is not affiliated with, endorsed by or supported by PitPat. It uses PitPat's private app API, which may change or stop working at any time. To keep the load on PitPat's servers low, it checks the collar's status every 5 minutes and only fetches activity once the collar has reported in.
 
 It signs in with the same email and password as the PitPat app. The password is used once to sign in and is never stored; the integration keeps only a refresh token, and asks you to sign in again if that stops working.
 
