@@ -443,18 +443,50 @@ async def test_fast_polling_during_walk(
     assert hass.states.get("sensor.rex_tracking_mode").state == "off"
     assert coordinator.update_interval.total_seconds() == 300
 
-    # The next tick after five minutes is a full update again (detailed
-    # activity is only fetched every 15 minutes, so it is not repeated yet).
+    # Without a new report, only the monitor is polled.
     _mock_endpoints(aioclient_mock, _monitor(0))
-    freezer.tick(300)
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done(wait_background_tasks=True)
+    await _tick(hass, freezer, 300)
+    assert _hosts(aioclient_mock) == ["Monitors"]
+
+
+async def test_full_update_after_each_report(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    freezer.move_to("2026-11-16T18:15:00+00:00")
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    entry = _entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Between reports only the monitor is polled.
+    for _ in range(3):
+        _mock_endpoints(aioclient_mock, _monitor(0))
+        await _tick(hass, freezer, 300)
+        assert _hosts(aioclient_mock) == ["Monitors"]
+
+    # A report brings new activity, so everything is fetched, detailed
+    # activity and walks included.
+    _mock_endpoints(aioclient_mock, _reported_at("2026-11-16T18:33:38Z"))
+    await _tick(hass, freezer, 300)
     assert sorted(_hosts(aioclient_mock)) == [
+        "2026-11-16T00:00:00.0000000Z",  # detailed activity
         "ActivityMonthAndDaysByMonth",
         "Dogs",
+        "GetTotalDistance",
         "Monitors",
         "batterycheck",
+        "recorded",
     ]
+
+    # Without reports, everything is still fetched once an hour.
+    _mock_endpoints(aioclient_mock, _reported_at("2026-11-16T18:33:38Z"))
+    for _ in range(11):
+        await _tick(hass, freezer, 300)
+    assert "Dogs" not in _hosts(aioclient_mock)
+    await _tick(hass, freezer, 300)
+    assert "Dogs" in _hosts(aioclient_mock)
 
 
 CADENCE_URL = (
@@ -705,21 +737,22 @@ async def _tick(hass: HomeAssistant, freezer: FrozenDateTimeFactory, seconds: in
     await hass.async_block_till_done(wait_background_tasks=True)
 
 
-async def test_detailed_activity_every_15_minutes(
+async def test_detailed_activity_every_15_minutes_during_walk(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     freezer: FrozenDateTimeFactory,
 ) -> None:
     # 23:40 in London, so the day changes during the test.
     freezer.move_to("2026-11-16T23:40:00+00:00")
-    _mock_endpoints(aioclient_mock, _monitor(0))
+    _mock_endpoints(aioclient_mock, _monitor(2))
     entry = _entry(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert _combined_calls(aioclient_mock) == ["2026-11-16T00:00:00.0000000Z"]
     assert hass.states.get("sensor.rex_steps_today").state == "12000"
 
-    # 23:45 and 23:50: full updates reuse the detailed activity.
+    # 23:45 and 23:50: during a walk everything is fetched every five
+    # minutes, but the detailed activity is reused.
     for _ in range(2):
         aioclient_mock.mock_calls.clear()
         await _tick(hass, freezer, 300)
@@ -732,7 +765,20 @@ async def test_detailed_activity_every_15_minutes(
     await _tick(hass, freezer, 300)
     assert _combined_calls(aioclient_mock) == ["2026-11-16T00:00:00.0000000Z"]
 
-    # 00:00: only five minutes later, but a new day, so fetch straight away.
+
+async def test_full_update_on_new_day(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    # 23:55 in London.
+    freezer.move_to("2026-11-16T23:55:00+00:00")
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    entry = _entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # 00:00: no new report, but a new day, so today's sensors start afresh.
     new_day = {
         **COMBINED_RESPONSE,
         "ActivityDay": {**COMBINED_RESPONSE["ActivityDay"], "TotalSteps": 12},
@@ -767,8 +813,8 @@ async def test_detailed_activity_retried_after_failure(
     await hass.async_block_till_done()
     assert hass.states.get("sensor.rex_steps_today").state == STATE_UNKNOWN
 
-    # The next full update tries again rather than waiting 15 minutes.
-    _mock_endpoints(aioclient_mock, _monitor(0))
+    # The next report tries again.
+    _mock_endpoints(aioclient_mock, _reported_at("2026-11-16T18:20:00Z"))
     await _tick(hass, freezer, 300)
     assert len(_combined_calls(aioclient_mock)) == 1
     assert hass.states.get("sensor.rex_steps_today").state == "12000"

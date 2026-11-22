@@ -24,11 +24,18 @@ from .live import PitPatLiveConnection
 
 _LOGGER = logging.getLogger(__name__)
 
-# Collars report in roughly every 20 minutes; polling more often catches each
-# report soon after it arrives.
+# Collars report in roughly every 20 minutes (less often in Economy mode).
+# Polling the monitors this often catches each report soon after it arrives;
+# the dogs and their activity are only fetched again once one has, as only a
+# report brings new activity.
 UPDATE_INTERVAL = timedelta(minutes=5)
+# Fetch everything at least this often anyway, in case something changed
+# without a report: activity synced by the app over Bluetooth, or the dog's
+# details edited in the app.
+FULL_UPDATE_INTERVAL = timedelta(hours=1)
 # While a dog is being live tracked (e.g. on a walk), poll its monitor quickly
-# so the map follows along. Dogs and activity still refresh at UPDATE_INTERVAL.
+# so the map follows along. Reports then come every few seconds, so dogs and
+# activity refresh every UPDATE_INTERVAL instead of on each one.
 # PitPat ends a walk by itself after three hours, and live tracking to find the
 # dog 10 minutes after the last keepAlive; LiveTrackingReason then returns to 0
 # and polling slows down again.
@@ -40,9 +47,10 @@ LIVE_CONNECTED_UPDATE_INTERVAL = timedelta(minutes=2)
 # take a few minutes. Poll quickly for this long after tracking is requested.
 LIVE_START_GRACE = timedelta(minutes=10)
 # Detailed activity (CombinedActivity) is a large response that only changes
-# when the collar uploads (roughly every 20 minutes), so fetch it less often.
-# Today's walks are fetched as often, and on every full update during a walk
-# so a finished walk shows up soon after it ends.
+# when the collar reports. It is fetched after each report, but reused for
+# this long by the five-minute full updates during a walk or live tracking.
+# Today's walks are reused the same way, except during a walk itself, so a
+# finished walk shows up soon after it ends.
 DETAILED_ACTIVITY_INTERVAL = timedelta(minutes=15)
 # Live tracking to find the dog stops 10 minutes after the last keepAlive. The
 # app sends one every 30 seconds while its map is open; we send them after
@@ -133,6 +141,10 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         self._keep_alive_until: dict[str, float] = {}
         self._keep_alive_seen: set[str] = set()
         self._unsub_keep_alive: CALLBACK_TYPE | None = None
+        # When each dog last reported, and its local day, as of its last full
+        # update.
+        self._full_update_reports: dict[str, datetime | None] = {}
+        self._full_update_days: dict[str, date] = {}
         # Dogs asked to report in, with when they last reported before that,
         # and until when (monotonic) to poll quickly for their reports.
         self._wake_up_reported_before: dict[str, datetime | None] = {}
@@ -153,11 +165,7 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
 
     @callback
     def async_expect_reports(self) -> None:
-        """Poll quickly until each dog reports in; called after a wake-up.
-
-        A report brings new activity too, so the first poll that sees one
-        refreshes everything for that dog.
-        """
+        """Poll quickly until each dog reports in; called after a wake-up."""
         self._wake_up_reported_before = {
             dog_id: dog_data.last_message_sent_at
             for dog_id, dog_data in (self.data or {}).items()
@@ -165,19 +173,32 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         self._wake_up_until = time.monotonic() + WAKE_UP_POLL.total_seconds()
         self.update_interval = LIVE_UPDATE_INTERVAL
 
-    @callback
     def _async_new_reports(self, polled: dict[str, PitPatDogData]) -> set[str]:
-        """Return the dogs that have reported in since being woken up."""
+        """Return the dogs that have reported in since their last full update.
+
+        Dogs being live tracked are left out: they report every few seconds.
+        """
+        return {
+            dog_id
+            for dog_id, dog_data in polled.items()
+            if dog_id in self._full_update_reports
+            and not dog_data.live_tracking
+            and _is_newer(
+                dog_data.last_message_sent_at, self._full_update_reports[dog_id]
+            )
+        }
+
+    @callback
+    def _async_check_woken_up(self, data: dict[str, PitPatDogData]) -> None:
+        """Stop waiting for the dogs that have reported in since a wake-up."""
         if time.monotonic() >= self._wake_up_until:
             self._wake_up_reported_before.clear()
-        reported = set()
-        for dog_id, before in self._wake_up_reported_before.items():
-            sent = polled[dog_id].last_message_sent_at if dog_id in polled else None
-            if sent and (before is None or sent > before):
-                reported.add(dog_id)
-        for dog_id in reported:
-            del self._wake_up_reported_before[dog_id]
-        return reported
+            return
+        for dog_id, before in list(self._wake_up_reported_before.items()):
+            if dog_id not in data or _is_newer(
+                data[dog_id].last_message_sent_at, before
+            ):
+                del self._wake_up_reported_before[dog_id]
 
     @callback
     def async_live_tracking_stopped(self, dog_id: str) -> None:
@@ -384,17 +405,24 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
     async def _async_update_data(self) -> dict[str, PitPatDogData]:
         user_id = self.config_entry.data[CONF_USER_ID]
         now = time.monotonic()
+        live = any(dog_data.live_tracking for dog_data in (self.data or {}).values())
+        full_interval = UPDATE_INTERVAL if live else FULL_UPDATE_INTERVAL
         full = (
             not self.data
-            or now - self._last_full_update >= UPDATE_INTERVAL.total_seconds()
+            or now - self._last_full_update >= full_interval.total_seconds()
+            or any(
+                self._full_update_days.get(dog_id) != _today(dog_data.dog)
+                for dog_id, dog_data in self.data.items()
+            )
         )
+        polled: dict[str, PitPatDogData] = {}
         try:
-            if self.data and (not full or self._wake_up_reported_before):
-                # Between full updates only the monitors change quickly.
-                data = await self._async_fetch_monitors(user_id)
+            if self.data:
+                # Only the monitors change between reports.
+                data = polled = await self._async_fetch_monitors(user_id)
                 if reported := self._async_new_reports(data):
                     _LOGGER.debug(
-                        "%s reported in after waking up, refreshing everything",
+                        "New report from %s, refreshing everything",
                         ", ".join(
                             data[dog_id].dog.get("Name", dog_id) for dog_id in reported
                         ),
@@ -406,16 +434,27 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
             if full:
                 dogs = await self.client.async_get_dogs(user_id)
                 results = await asyncio.gather(
-                    *(self._async_fetch_dog(user_id, dog) for dog in dogs)
+                    *(
+                        self._async_fetch_dog(user_id, dog, polled.get(dog["Id"]))
+                        for dog in dogs
+                    )
                 )
                 data = {result.dog["Id"]: result for result in results}
                 self._last_full_update = now
+                self._full_update_reports = {
+                    dog_id: dog_data.last_message_sent_at
+                    for dog_id, dog_data in data.items()
+                }
+                self._full_update_days = {
+                    dog_id: _today(dog_data.dog) for dog_id, dog_data in data.items()
+                }
         except PitPatAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except PitPatConnectionError as err:
             raise UpdateFailed(str(err)) from err
 
         self._async_check_live_pushes(data)
+        self._async_check_woken_up(data)
         fast = (
             now < self._fast_poll_until
             or bool(self._wake_up_reported_before)
@@ -468,18 +507,14 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         }
 
     async def _async_fetch_dog(
-        self, user_id: str, dog: dict[str, Any]
+        self, user_id: str, dog: dict[str, Any], polled: PitPatDogData | None
     ) -> PitPatDogData:
-        # Activity days are the dog's local calendar days.
-        tz = (
-            dt_util.get_time_zone(dog.get("IanaTimeZoneName") or "")
-            or dt_util.get_default_time_zone()
-        )
-        today = dt_util.now(tz).date()
+        """Fetch everything for a dog, reusing its monitor if just polled."""
+        today = _today(dog)
         yesterday = today - timedelta(days=1)
 
         monitor, months, detail, walks, needs_charging = await asyncio.gather(
-            self.client.async_get_monitor(user_id, dog["Id"]),
+            self._async_monitor(user_id, dog["Id"], polled),
             # Whole months come back, so this also covers yesterday on the 1st.
             self.client.async_get_activity(user_id, dog["Id"], yesterday, today),
             self._async_detailed_activity(user_id, dog["Id"], today),
@@ -513,6 +548,13 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
             walks=walks,
             walks_date=today if walks is not None else None,
         )
+
+    async def _async_monitor(
+        self, user_id: str, dog_id: str, polled: PitPatDogData | None
+    ) -> dict[str, Any] | None:
+        if polled is not None:
+            return polled.monitor
+        return await self.client.async_get_monitor(user_id, dog_id)
 
     async def _async_detailed_activity(
         self, user_id: str, dog_id: str, today: date
@@ -594,3 +636,17 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         except PitPatConnectionError as err:
             _LOGGER.debug("Could not check charging for %s: %s", dog_id, err)
             return None
+
+
+def _is_newer(sent: datetime | None, before: datetime | None) -> bool:
+    """Whether a report was sent after the one before it (if any)."""
+    return sent is not None and (before is None or sent > before)
+
+
+def _today(dog: dict[str, Any]) -> date:
+    """The dog's local date; activity days are its local calendar days."""
+    tz = (
+        dt_util.get_time_zone(dog.get("IanaTimeZoneName") or "")
+        or dt_util.get_default_time_zone()
+    )
+    return dt_util.now(tz).date()

@@ -41,7 +41,7 @@ One device per dog (named after the dog), with:
 | Distance today | Distance covered so far today |
 | Calories today | Calories burned so far today (kcal) |
 | Total steps | Lifetime step count from the collar; good for long-term statistics |
-| Total distance | Lifetime distance in km; refreshed every 15 minutes with the detailed activity |
+| Total distance | Lifetime distance in km |
 | Activity data up to | Time of the latest activity data PitPat has received (diagnostic) |
 | Exercise goal progress | Today's exercise as a percentage of the goal |
 | Exercise goal met today | On once today's goal is reached |
@@ -58,7 +58,7 @@ One device per dog (named after the dog), with:
 | Geocoded location | Street address at the last known position, looked up from OpenStreetMap when the dog has moved 50 m or more. Attributes hold the full address, street, locality, postcode and country. See the privacy note below |
 | Last location fix | When the collar took its last location fix |
 | Location accuracy | How accurate the last location fix is, in metres |
-| Walks today | Number of walks so far today; refreshed every 15 minutes, and every 5 minutes during a walk |
+| Walks today | Number of walks so far today; refreshed after each report, and every 5 minutes during a walk |
 | Last walk | When today's latest walk ended. Attributes hold its start, duration, vicinity and, once PitPat has worked them out, steps, distance (m) and calories |
 | Tracking mode | Off, Live tracking or Walk |
 | Tracking status | Progress of a walk or live tracking, as the app shows it: Idle, Waiting for next contact (the collar hasn't picked up the request yet), Listening to satellites (it has, and is getting a GPS fix) or Live tracking (fixes are coming in) |
@@ -69,7 +69,7 @@ One device per dog (named after the dog), with:
 | Network type | Mobile network technology: LTE-M or NB-IoT (diagnostic, disabled by default) |
 | Rapid wake-up | Shown as "[+]" after the network type in the app. Probably whether PitPat can wake the collar straight away on its current connection, rather than at its next check-in (diagnostic, disabled by default) |
 
-Data is refreshed every 5 minutes; collars report in roughly every 20 minutes. Steps, distance, calories and the walking/running/playing minutes come from a larger response and are refreshed every 15 minutes (and straight away when the day changes). During a walk or live tracking the integration also connects to PitPat's live updates service, the same one the app's map uses, so each location the collar reports (about every 30 seconds) appears straight away. While connected, the collar's status is also polled every 2 minutes as a fallback; if the connection can't be made or drops, or a poll finds a report the connection missed, polling goes back to every 30 seconds and it reconnects. When tracking ends, PitPat says so over the connection, which then closes, and polling returns to normal.
+Collars report in roughly every 20 minutes (less often in Economy GPS mode). The integration checks the collar's status every 5 minutes, and only fetches the activity and other data once the collar has reported, as nothing else changes in between. It also fetches everything at least once an hour, and when the dog's day changes, to pick up changes made in the app. During a walk or live tracking the integration also connects to PitPat's live updates service, the same one the app's map uses, so each location the collar reports (about every 30 seconds) appears straight away. While connected, the collar's status is also polled every 2 minutes as a fallback; if the connection can't be made or drops, or a poll finds a report the connection missed, polling goes back to every 30 seconds and it reconnects. When tracking ends, PitPat says so over the connection, which then closes, and polling returns to normal.
 
 PitPat ends a walk by itself after three hours. Live tracking to find the dog ends 10 minutes after the last "keep-alive", which the app sends every 30 seconds while its map is open. Home Assistant sends them for live tracking it started (not for tracking started in the app), until tracking is stopped or for at most three hours.
 
