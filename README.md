@@ -94,6 +94,16 @@ The device page for a dog:
   </tr>
 </table>
 
+## Known working versions
+
+| | Version |
+| --- | --- |
+| Monitor model | 6 |
+| Firmware | 1.4.4 |
+| Hardware | 6.3.5 |
+
+The device page shows your collar's firmware and hardware versions. If it works with other versions, please open an issue so they can be added.
+
 ## Notes
 
 - PitPat locks sign-in for 10 minutes after several failed attempts. The integration never retries a failed sign-in by itself.
