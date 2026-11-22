@@ -79,6 +79,10 @@ Starting a walk or live tracking wakes the collar, which can take a few minutes 
 
 ## Screenshots
 
+An example dashboard built from the integration's entities:
+
+![Example dashboard with tracking controls, today's activity, network status, and a map of the dog's location and walk route](docs/images/example-dashboard.png)
+
 The device page for a dog:
 
 <table>
