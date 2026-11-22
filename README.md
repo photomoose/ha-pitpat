@@ -12,9 +12,9 @@ It signs in with the same email and password as the PitPat app. The password is 
 
 ### From the Marketplace
 
-[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=photomoose&repository=ha-pitpat&category=integration)
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=photomoose&repository=ha-pitpat&category=integration)
 
-Until PitPat is listed in the Marketplace, add `https://github.com/photomoose/ha-pitpat` under **Settings → Marketplace → Custom repositories** (category **Integration**), then install **PitPat**. On Home Assistant 2026.10 or older, do the same in HACS and restart Home Assistant afterwards.
+The button opens PitPat in the Marketplace (or in HACS on Home Assistant 2026.10 and older), offering to add the repository first if it isn't listed yet. Install **PitPat**; with HACS, restart Home Assistant afterwards.
 
 Then go to **Settings → Devices & services → Add integration** and search for **PitPat**.
 
