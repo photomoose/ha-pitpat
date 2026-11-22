@@ -97,20 +97,24 @@ The device page for a dog:
 - PitPat locks sign-in for 10 minutes after several failed attempts. The integration never retries a failed sign-in by itself.
 - This integration uses PitPat's private app API, which may change without notice.
 
+## Privacy
+
+The Geocoded location sensor sends the dog's coordinates to OpenStreetMap's Nominatim service (nominatim.openstreetmap.org) to look up the address. Nothing else is sent: no PitPat account details, tokens or dog names. To stop these lookups, disable the Geocoded location entity.
+
 ## Development
 
 ```sh
-python3 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/pip install -r requirements_test.txt
 .venv/bin/pytest
 ```
 
 `scripts/try_login.py` exercises the sign-in flow and API without Home Assistant.
 
+## Contributing
+
+Pull requests are welcome. For larger changes, please open an issue first to discuss them. Make sure the tests pass (they need Python 3.14), and keep real account details, coordinates and dog names out of tests and logs.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE). PitPat is a trademark of its owner and is used here only to say what the integration works with.
-
-### Privacy
-
-The Geocoded location sensor sends the dog's coordinates to OpenStreetMap's Nominatim service (nominatim.openstreetmap.org) to look up the address. Nothing else is sent: no PitPat account details, tokens or dog names. To stop these lookups, disable the Geocoded location entity.
