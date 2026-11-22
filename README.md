@@ -31,7 +31,7 @@ One device per dog (named after the dog), with:
 | Start live tracking (button) | Starts live tracking to find the dog. Home Assistant keeps it going, as the app does while its map is open, until it's stopped or for at most three hours |
 | Start a walk (button) | Starts a walk, which also puts the collar into live tracking |
 | Stop live tracking (button) | Ends live tracking, whether started as a walk or to find the dog |
-| Request update (button) | Asks the collar to report in now rather than at its next check-in, as the app does when it opens. PitPat sends this to all the account's collars |
+| Request update (button) | Asks the collar to report in now rather than at its next check-in, as the app does when it opens. PitPat sends this to all the account's collars. Home Assistant then checks every 30 seconds, for up to 3 minutes, and refreshes all the sensors as soon as the collar reports |
 | Background tracking (switch) | Turns the collar's background location tracking on or off. Like GPS mode, Home Assistant shows the new setting until the collar reports it. |
 | GPS mode (select) | How often the collar checks in: Economy (least battery, but slowest to start live tracking), Standard, or Urgent (most battery, quickest to start). A change may take until the collar next reports in to show up in PitPat; Home Assistant shows the new mode meanwhile. |
 | Device tracker | Last known GPS position of the collar, with accuracy |

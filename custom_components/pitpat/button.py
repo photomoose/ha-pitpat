@@ -12,7 +12,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import PitPatApiClient
-from .coordinator import WAKE_UP_POLL, PitPatConfigEntry
+from .coordinator import PitPatConfigEntry
 from .entity import PitPatEntity, async_add_dog_entities
 
 
@@ -78,7 +78,10 @@ async def async_setup_entry(
         entry,
         async_add_entities,
         lambda coordinator, dog_id: [
-            *(PitPatButton(coordinator, dog_id, description) for description in BUTTONS),
+            *(
+                PitPatButton(coordinator, dog_id, description)
+                for description in BUTTONS
+            ),
             PitPatWakeUpButton(coordinator, dog_id, WAKE_UP),
         ],
     )
@@ -118,6 +121,6 @@ class PitPatWakeUpButton(PitPatEntity, ButtonEntity):
         await self._async_command(wake_up, "Could not request an update")
         if not accepted:
             raise HomeAssistantError("PitPat did not accept the update request")
-        self.coordinator.async_poll_quickly(WAKE_UP_POLL)
+        self.coordinator.async_expect_reports()
         # Also starts the quicker polling schedule.
-        await self.coordinator.async_refresh_monitor(self._dog_id)
+        await self.coordinator.async_refresh()

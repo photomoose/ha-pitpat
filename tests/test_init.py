@@ -1180,6 +1180,14 @@ async def test_reconnects_when_live_updates_miss_a_report(
     assert len(mock_live.connections) == 2
 
 
+def _reported_at(sent: str) -> dict:
+    monitor = copy.deepcopy(_monitor(0))
+    timings = monitor["Value"]["Monitor"]["ContactTimings"]["Value"]
+    timings["LastMessageSentAt"] = sent
+    timings["LastMessageReceivedAt"] = sent
+    return monitor
+
+
 async def test_request_update_button(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
@@ -1198,7 +1206,24 @@ async def test_request_update_button(
     assert _hosts(aioclient_mock) == ["wakeup", "Monitors"]
     put = next(c for c in aioclient_mock.mock_calls if c[0] == "PUT")
     assert put[1].query["source"] == "Other"
-    # Polls quickly while the monitor reports in, then slows down again.
+    # Polls quickly while waiting for the monitor to report in.
+    assert coordinator.update_interval.total_seconds() == 30
+    aioclient_mock.mock_calls.clear()
+    await _tick(hass, freezer, 30)
+    assert _hosts(aioclient_mock) == ["Monitors"]
+
+    # The report brings new activity, so everything is refreshed at once,
+    # detailed activity included, and polling slows down again.
+    _mock_endpoints(aioclient_mock, _reported_at("2026-11-16T18:15:40Z"))
+    await _tick(hass, freezer, 30)
+    assert _hosts(aioclient_mock)[0] == "Monitors"
+    urls = [str(c[1]) for c in aioclient_mock.mock_calls]
+    for endpoint in ("/Dogs", "CombinedActivity", "tracking/day", "batterycheck"):
+        assert any(endpoint in url for url in urls), endpoint
+    assert coordinator.update_interval.total_seconds() == 300
+
+    # Without a report, quick polling stops after a few minutes.
+    await _press(hass, "button.rex_request_update")
     assert coordinator.update_interval.total_seconds() == 30
     for _ in range(int(WAKE_UP_POLL.total_seconds() // 30) + 1):
         await _tick(hass, freezer, 30)
