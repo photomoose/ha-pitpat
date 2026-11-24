@@ -2,7 +2,7 @@
 
 A custom integration that brings your PitPat dog activity monitor data into Home Assistant.
 
-_Does your furry friend not yet have a PitPat GPS tracker? Please consider buying one from [PitPat's online store](https://www.pitpat.com/gps-tracker/) for a one-off purchase fee without any ongoing subscription. Although no monthly subscription is applied, it still costs money to run infrastructure indefinitely, so please consider supporting PitPat by making a purchase._
+_Does your furry friend not yet have a PitPat GPS tracker? Please consider buying one from [PitPat's online store](https://www.pitpat.com/gps-tracker/) for a one-off purchase fee without any ongoing subscription. Although no monthly subscription is applied, it still costs money to run infrastructure indefinitely, so please support PitPat by making a purchase._
 
 > This is an unofficial project. It is not affiliated with, endorsed by or supported by PitPat. It uses PitPat's private app API, which may change or stop working at any time. To keep the load on PitPat's servers low, it checks the collar's status every 5 minutes and only fetches activity once the collar has reported in.
 

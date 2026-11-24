@@ -30,10 +30,13 @@ async def main() -> None:
     email = os.environ.get("PITPAT_EMAIL") or input("Email: ")
     password = getpass.getpass("Password: ")
 
-    tokens = await async_login(email, password)
-    print(f"Login OK: sub={tokens.subject}, expires in {tokens.expires_at - time.time():.0f}s")
+    async with (
+        aiohttp.ClientSession() as login_session,
+        aiohttp.ClientSession() as session,
+    ):
+        tokens = await async_login(login_session, session, email, password)
+        print(f"Login OK: sub={tokens.subject}, expires in {tokens.expires_at - time.time():.0f}s")
 
-    async with aiohttp.ClientSession() as session:
         refreshed = await async_refresh(session, tokens.refresh_token)
         rotated = refreshed.refresh_token != tokens.refresh_token
         print(f"Refresh OK: refresh token rotated={rotated}")

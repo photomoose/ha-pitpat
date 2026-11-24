@@ -4,6 +4,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ha_pitpat.auth import PitPatAuthError, PitPatConnectionError
@@ -30,7 +31,14 @@ async def test_user_flow(hass: HomeAssistant, mock_login, mock_api) -> None:
         CONF_REFRESH_TOKEN: "refresh-1",
     }
     assert CONF_PASSWORD not in result["data"]
-    mock_login.assert_awaited_once_with("me@example.com", "secret")
+    mock_login.assert_awaited_once()
+    login_session, session, *creds = mock_login.await_args.args
+    assert creds == ["me@example.com", "secret"]
+    assert session is async_get_clientsession(hass)
+    assert login_session is not session
+    assert login_session.cookie_jar is not session.cookie_jar
+    # Detached from Home Assistant's connector once done.
+    assert login_session.closed
 
 
 async def test_user_flow_errors_then_recovers(
@@ -55,6 +63,10 @@ async def test_user_flow_errors_then_recovers(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     # Each submission is exactly one login attempt; no automatic retries.
     assert mock_login.await_count == 3
+    # Each with a new session, cleaned up even after an error.
+    sessions = [call.args[0] for call in mock_login.await_args_list]
+    assert len({id(session) for session in sessions}) == 3
+    assert all(session.closed for session in sessions)
 
 
 async def test_already_configured(hass: HomeAssistant, mock_login, mock_api) -> None:

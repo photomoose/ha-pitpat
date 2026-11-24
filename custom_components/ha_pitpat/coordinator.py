@@ -6,7 +6,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, tzinfo
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -78,6 +78,8 @@ class PitPatDogData:
 
     dog: dict[str, Any]
     monitor: dict[str, Any] | None
+    # The dog's time zone, or None to use Home Assistant's.
+    time_zone: tzinfo | None = None
     # Activity for the dog's local today/yesterday and the current month.
     today: dict[str, Any] | None = None
     yesterday: dict[str, Any] | None = None
@@ -411,7 +413,7 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
             not self.data
             or now - self._last_full_update >= full_interval.total_seconds()
             or any(
-                self._full_update_days.get(dog_id) != _today(dog_data.dog)
+                self._full_update_days.get(dog_id) != _today(dog_data.time_zone)
                 for dog_id, dog_data in self.data.items()
             )
         )
@@ -446,7 +448,8 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
                     for dog_id, dog_data in data.items()
                 }
                 self._full_update_days = {
-                    dog_id: _today(dog_data.dog) for dog_id, dog_data in data.items()
+                    dog_id: _today(dog_data.time_zone)
+                    for dog_id, dog_data in data.items()
                 }
         except PitPatAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
@@ -510,7 +513,8 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         self, user_id: str, dog: dict[str, Any], polled: PitPatDogData | None
     ) -> PitPatDogData:
         """Fetch everything for a dog, reusing its monitor if just polled."""
-        today = _today(dog)
+        time_zone = await _async_time_zone(dog)
+        today = _today(time_zone)
         yesterday = today - timedelta(days=1)
 
         monitor, months, detail, walks, needs_charging = await asyncio.gather(
@@ -537,6 +541,7 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         return PitPatDogData(
             dog,
             monitor,
+            time_zone=time_zone,
             today=days.get(today),
             yesterday=days.get(yesterday),
             month=month,
@@ -643,10 +648,18 @@ def _is_newer(sent: datetime | None, before: datetime | None) -> bool:
     return sent is not None and (before is None or sent > before)
 
 
-def _today(dog: dict[str, Any]) -> date:
-    """The dog's local date; activity days are its local calendar days."""
-    tz = (
-        dt_util.get_time_zone(dog.get("IanaTimeZoneName") or "")
-        or dt_util.get_default_time_zone()
-    )
-    return dt_util.now(tz).date()
+async def _async_time_zone(dog: dict[str, Any]) -> tzinfo | None:
+    """The dog's time zone, or None if it is missing or unknown."""
+    name = dog.get("IanaTimeZoneName")
+    if not name:
+        return None
+    try:
+        return await dt_util.async_get_time_zone(name)
+    except ValueError:
+        # Not even a well-formed zone name.
+        return None
+
+
+def _today(time_zone: tzinfo | None) -> date:
+    """The local date there; a dog's activity days are its calendar days."""
+    return dt_util.now(time_zone).date()

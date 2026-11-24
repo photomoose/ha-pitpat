@@ -6,10 +6,14 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import (
+    async_create_clientsession,
+    async_get_clientsession,
+)
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
@@ -43,15 +47,23 @@ class PitPatConfigFlow(ConfigFlow, domain=DOMAIN):
         self, email: str, password: str
     ) -> tuple[dict[str, Any] | None, dict[str, str]]:
         """Log in; return (entry data, errors). The password is never stored."""
+        session = async_get_clientsession(self.hass)
+        # A session per attempt, so login cookies never leak into the shared one.
+        login_session = async_create_clientsession(
+            self.hass, auto_cleanup=False, cookie_jar=aiohttp.CookieJar()
+        )
         try:
-            tokens = await async_login(email, password)
-            client = PitPatApiClient(async_get_clientsession(self.hass), tokens)
+            tokens = await async_login(login_session, session, email, password)
+            client = PitPatApiClient(session, tokens)
             settings = await client.async_get_settings()
         except PitPatAuthError:
             return None, {"base": "invalid_auth"}
         except PitPatConnectionError:
             _LOGGER.exception("Error connecting to PitPat")
             return None, {"base": "cannot_connect"}
+        finally:
+            # Not close(), as Home Assistant's connector is shared.
+            login_session.detach()
         return {
             CONF_EMAIL: email,
             CONF_USER_ID: settings["UserId"],
