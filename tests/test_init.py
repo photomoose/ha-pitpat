@@ -2,6 +2,7 @@
 
 import copy
 import re
+from unittest.mock import patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
@@ -10,6 +11,7 @@ from homeassistant.const import CONF_EMAIL, STATE_UNKNOWN, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -275,6 +277,54 @@ async def test_activity_uses_dog_local_day_across_month_boundary(
     assert hass.states.get("sensor.rex_exercise_today").state == "5"
     assert hass.states.get("sensor.rex_exercise_yesterday").state == "75"
     assert hass.states.get("sensor.rex_exercise_goals_met_this_month").state == "0"
+
+
+@pytest.mark.parametrize("time_zone", [None, "", "Nope/X", "../x"])
+async def test_activity_falls_back_to_default_time_zone(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+    time_zone: str | None,
+) -> None:
+    await hass.config.async_set_time_zone("America/Los_Angeles")
+    # 03:00 UTC on 1 Dec is still 30 Nov in Los Angeles.
+    freezer.move_to("2026-12-01T03:00:00+00:00")
+    dog = {**DOG, "IanaTimeZoneName": time_zone}
+    aioclient_mock.post(TOKEN_URL, json=TOKENS)
+    aioclient_mock.get(f"{API_BASE_URL}/api/Users/{USER_ID}/Dogs", json=[dog])
+    aioclient_mock.get(
+        f"{API_BASE_URL}/api/Users/{USER_ID}/Dogs/{DOG_ID}/Monitors",
+        json={"HasValue": False},
+    )
+    aioclient_mock.get(ACTIVITY_URL, json=[])
+    aioclient_mock.get(COMBINED_URL, json=COMBINED_RESPONSE)
+    aioclient_mock.get(TOTAL_DISTANCE_URL, json=TOTAL_DISTANCE_RESPONSE)
+    _mock_location_extras(aioclient_mock)
+    aioclient_mock.get(NOMINATIM_URL, json=NOMINATIM_RESPONSE)
+    entry = _entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    activity_call = next(
+        c for c in aioclient_mock.mock_calls if c[1].path.endswith("ByMonth")
+    )
+    assert activity_call[1].query["endDate"] == "2026-11-30T00:00:00.0000000Z"
+
+
+async def test_time_zone_is_not_looked_up_on_the_event_loop(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    entry = _entry(hass)
+    with patch.object(
+        dt_util, "get_time_zone", side_effect=AssertionError("blocking lookup")
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        # Also when checking whether the day has changed.
+        await entry.runtime_data.async_refresh()
+    assert entry.runtime_data.last_update_success
+    assert str(entry.runtime_data.data[DOG_ID].time_zone) == "Europe/London"
 
 
 async def test_auth_failure_starts_reauth(
