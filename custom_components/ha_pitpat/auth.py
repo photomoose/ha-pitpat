@@ -126,10 +126,17 @@ async def _token_request(
         raise PitPatConnectionError(f"Token request failed: {err}") from err
 
 
-async def async_login(email: str, password: str) -> TokenSet:
+async def async_login(
+    login_session: aiohttp.ClientSession,
+    session: aiohttp.ClientSession,
+    email: str,
+    password: str,
+) -> TokenSet:
     """Sign in with email and password and return a fresh token set.
 
-    Uses a throwaway session so login cookies never leak into a shared one.
+    ``login_session`` holds the login cookies, so it must have a cookie jar of
+    its own and be used for one login only. ``session`` may be shared; it
+    exchanges the code for tokens. The caller owns both.
     """
     verifier, challenge = _pkce_pair()
     state = secrets.token_urlsafe(16)
@@ -145,62 +152,65 @@ async def async_login(email: str, password: str) -> TokenSet:
             "prompt": "login",
         }
     )
-    browser_headers = {
-        "User-Agent": BROWSER_USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-GB,en;q=0.9",
+    # Sent with each request: Home Assistant's sessions override a User-Agent
+    # set on the session.
+    browser: dict[str, Any] = {
+        "headers": {
+            "User-Agent": BROWSER_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-GB,en;q=0.9",
+        },
+        "timeout": TIMEOUT,
     }
 
-    async with aiohttp.ClientSession(
-        cookie_jar=aiohttp.CookieJar(), headers=browser_headers, timeout=TIMEOUT
-    ) as session:
-        try:
-            # /connect/authorize redirects to the login page.
-            async with session.get(authorize_url) as resp:
-                resp.raise_for_status()
-                login_url = str(resp.url)
-                login_html = await resp.text()
+    try:
+        # /connect/authorize redirects to the login page.
+        async with login_session.get(authorize_url, **browser) as resp:
+            resp.raise_for_status()
+            login_url = str(resp.url)
+            login_html = await resp.text()
 
-            inputs = _form_inputs(login_html)
-            if "__RequestVerificationToken" not in inputs:
-                raise PitPatConnectionError("Login form not found")
+        inputs = _form_inputs(login_html)
+        if "__RequestVerificationToken" not in inputs:
+            raise PitPatConnectionError("Login form not found")
 
-            async with session.post(
-                login_url,
-                data={
-                    "Input.Email.Value": email,
-                    "Input.Password.Value": password,
-                    "__RequestVerificationToken": inputs[
-                        "__RequestVerificationToken"
-                    ],
-                },
+        async with login_session.post(
+            login_url,
+            data={
+                "Input.Email.Value": email,
+                "Input.Password.Value": password,
+                "__RequestVerificationToken": inputs["__RequestVerificationToken"],
+            },
+            allow_redirects=False,
+            **browser,
+        ) as resp:
+            if resp.status == 200:
+                # The form is re-rendered on bad credentials or lockout.
+                raise PitPatAuthError("Invalid email or password")
+            if resp.status not in (301, 302, 303):
+                raise PitPatConnectionError(
+                    f"Unexpected login response: HTTP {resp.status}"
+                )
+            location = resp.headers["Location"]
+
+        # Follow redirects until IdentityServer hands back the app redirect.
+        for _ in range(MAX_REDIRECTS):
+            if location.startswith(REDIRECT_URI):
+                break
+            async with login_session.get(
+                urljoin(AUTH_BASE_URL, location),
                 allow_redirects=False,
+                **browser,
             ) as resp:
-                if resp.status == 200:
-                    # The form is re-rendered on bad credentials or lockout.
-                    raise PitPatAuthError("Invalid email or password")
                 if resp.status not in (301, 302, 303):
                     raise PitPatConnectionError(
-                        f"Unexpected login response: HTTP {resp.status}"
+                        f"Unexpected authorize response: HTTP {resp.status}"
                     )
                 location = resp.headers["Location"]
-
-            # Follow redirects until IdentityServer hands back the app redirect.
-            for _ in range(MAX_REDIRECTS):
-                if location.startswith(REDIRECT_URI):
-                    break
-                async with session.get(
-                    urljoin(AUTH_BASE_URL, location), allow_redirects=False
-                ) as resp:
-                    if resp.status not in (301, 302, 303):
-                        raise PitPatConnectionError(
-                            f"Unexpected authorize response: HTTP {resp.status}"
-                        )
-                    location = resp.headers["Location"]
-            else:
-                raise PitPatConnectionError("Too many redirects during login")
-        except (aiohttp.ClientError, TimeoutError, KeyError) as err:
-            raise PitPatConnectionError(f"Login failed: {err}") from err
+        else:
+            raise PitPatConnectionError("Too many redirects during login")
+    except (aiohttp.ClientError, TimeoutError, KeyError) as err:
+        raise PitPatConnectionError(f"Login failed: {err}") from err
 
     params = {k: v[0] for k, v in parse_qs(urlparse(location).query).items()}
     if "error" in params:
@@ -212,22 +222,19 @@ async def async_login(email: str, password: str) -> TokenSet:
     if "code" not in params:
         raise PitPatConnectionError("No authorization code returned")
 
-    async with aiohttp.ClientSession() as session:
-        return await _token_request(
-            session,
-            {
-                "grant_type": "authorization_code",
-                "code": params["code"],
-                "redirect_uri": REDIRECT_URI,
-                "code_verifier": verifier,
-                "client_id": CLIENT_ID,
-            },
-        )
+    return await _token_request(
+        session,
+        {
+            "grant_type": "authorization_code",
+            "code": params["code"],
+            "redirect_uri": REDIRECT_URI,
+            "code_verifier": verifier,
+            "client_id": CLIENT_ID,
+        },
+    )
 
 
-async def async_refresh(
-    session: aiohttp.ClientSession, refresh_token: str
-) -> TokenSet:
+async def async_refresh(session: aiohttp.ClientSession, refresh_token: str) -> TokenSet:
     """Exchange a refresh token for a new token set.
 
     IdentityServer may rotate refresh tokens, so callers must persist the
