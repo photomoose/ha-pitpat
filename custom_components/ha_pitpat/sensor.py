@@ -439,6 +439,8 @@ SENSORS: tuple[PitPatSensorDescription, ...] = (
 GEOCODED_LOCATION = SensorEntityDescription(
     key="geocoded_location",
     translation_key="geocoded_location",
+    # Off until switched on: it sends the dog's coordinates to OpenStreetMap.
+    entity_registry_enabled_default=False,
 )
 
 

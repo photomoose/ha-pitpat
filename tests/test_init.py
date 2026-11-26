@@ -1435,6 +1435,32 @@ def _nominatim_calls(aioclient_mock: AiohttpClientMocker) -> list:
     return [c for c in aioclient_mock.mock_calls if str(c[1]).startswith(NOMINATIM_URL)]
 
 
+def _enable_geocoded_location(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """Pre-register the Geocoded location sensor as enabled; it is off by default."""
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOG_ID}_geocoded_location",
+        suggested_object_id="rex_geocoded_location",
+        config_entry=entry,
+        disabled_by=None,
+    )
+
+
+async def test_geocoded_location_disabled_by_default(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    _mock_endpoints(aioclient_mock, _monitor(2))
+    entry = _entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    registry_entry = er.async_get(hass).async_get("sensor.rex_geocoded_location")
+    assert registry_entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    # Nothing goes to OpenStreetMap until the sensor is switched on.
+    assert _nominatim_calls(aioclient_mock) == []
+
+
 async def test_geocoded_location(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
@@ -1443,6 +1469,7 @@ async def test_geocoded_location(
     freezer.move_to("2026-11-16T18:15:00+00:00")
     _mock_endpoints(aioclient_mock, _monitor(2))
     entry = _entry(hass)
+    _enable_geocoded_location(hass, entry)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
 
@@ -1504,6 +1531,7 @@ async def test_geocoded_location_errors(
     aioclient_mock.get(TOTAL_DISTANCE_URL, json=TOTAL_DISTANCE_RESPONSE)
     _mock_location_extras(aioclient_mock)
     entry = _entry(hass)
+    _enable_geocoded_location(hass, entry)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
     assert hass.states.get("sensor.rex_geocoded_location").state == STATE_UNKNOWN

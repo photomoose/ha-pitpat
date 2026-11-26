@@ -57,7 +57,7 @@ One device per dog (named after the dog), with:
 | Last activity                        | When the collar last recorded activity                                                                                                                                                                                                                                          |
 | Last sync                            | When the collar last reported in (diagnostic)                                                                                                                                                                                                                                   |
 | Next expected contact                | When the collar is next due to report (diagnostic)                                                                                                                                                                                                                              |
-| Geocoded location                    | Street address at the last known position, looked up from OpenStreetMap when the dog has moved 50 m or more. Attributes hold the full address, street, locality, postcode and country. See the privacy note below                                                               |
+| Geocoded location                    | Street address at the last known position, looked up from OpenStreetMap when the dog has moved 50 m or more. Attributes hold the full address, street, locality, postcode and country. Disabled by default; see the privacy note below                                                               |
 | Last location fix                    | When the collar took its last location fix                                                                                                                                                                                                                                      |
 | Location accuracy                    | How accurate the last location fix is, in metres                                                                                                                                                                                                                                |
 | Walks today                          | Number of walks so far today; refreshed after each report, and every 5 minutes during a walk                                                                                                                                                                                    |
@@ -115,7 +115,7 @@ The device page shows your collar's firmware and hardware versions. If it works 
 
 ## Privacy
 
-The Geocoded location sensor sends the dog's coordinates to OpenStreetMap's Nominatim service (nominatim.openstreetmap.org) to look up the address. Nothing else is sent: no PitPat account details, tokens or dog names. To stop these lookups, disable the Geocoded location entity.
+The Geocoded location sensor sends the dog's coordinates to OpenStreetMap's Nominatim service (nominatim.openstreetmap.org) to look up the address. Nothing else is sent: no PitPat account details, tokens or dog names. The entity is disabled by default, so no lookups happen until you enable it; disable it again to stop them.
 
 ## Development
 
