@@ -17,7 +17,7 @@ import aiohttp
 from .auth import TIMEOUT, PitPatConnectionError
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
-USER_AGENT = "HomeAssistant-PitPat/1.0.1 (+https://github.com/photomoose/ha-pitpat)"
+USER_AGENT = "HomeAssistant-PitPat/1.0.2-beta.1 (+https://github.com/photomoose/ha-pitpat)"
 ATTRIBUTION = "Data © OpenStreetMap contributors, ODbL"
 # Seconds between requests, shared by all dogs.
 MIN_INTERVAL = 1.0
