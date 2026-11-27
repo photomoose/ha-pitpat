@@ -539,6 +539,114 @@ async def test_full_update_after_each_report(
     assert "Dogs" in _hosts(aioclient_mock)
 
 
+
+def _contact(sent: str, expected: str) -> dict:
+    monitor = _reported_at(sent)
+    timings = monitor["Value"]["Monitor"]["ContactTimings"]["Value"]
+    timings["NextMessageExpectedAt"] = expected
+    return monitor
+
+
+async def test_poll_just_after_expected_report(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    # The next report is expected at 18:33:38.
+    freezer.move_to("2026-11-16T18:15:00+00:00")
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    entry = _entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Regular polling carries on in between.
+    for _ in range(3):
+        _mock_endpoints(aioclient_mock, _monitor(0))
+        await _tick(hass, freezer, 300)
+        assert _hosts(aioclient_mock) == ["Monitors"]
+
+    # Nothing until 5 seconds after the expected time (18:33:43)...
+    _mock_endpoints(
+        aioclient_mock, _contact("2026-11-16T18:33:38Z", "2026-11-16T18:53:38Z")
+    )
+    await _tick(hass, freezer, 222)
+    assert _hosts(aioclient_mock) == []
+
+    # ...then a poll picks up the report straight away.
+    await _tick(hass, freezer, 1)
+    assert "Monitors" in _hosts(aioclient_mock)
+    assert "Dogs" in _hosts(aioclient_mock)
+
+    # Regular polling resumes five minutes on.
+    _mock_endpoints(
+        aioclient_mock, _contact("2026-11-16T18:33:38Z", "2026-11-16T18:53:38Z")
+    )
+    await _tick(hass, freezer, 299)
+    assert _hosts(aioclient_mock) == []
+    await _tick(hass, freezer, 1)
+    assert _hosts(aioclient_mock) == ["Monitors"]
+
+
+async def test_no_repeat_poll_when_report_is_late(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    freezer.move_to("2026-11-16T18:33:00+00:00")
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    entry = _entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # The collar misses 18:33:38: a poll just after it finds nothing new...
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    await _tick(hass, freezer, 43)
+    assert _hosts(aioclient_mock) == ["Monitors"]
+
+    # ...and so does a retry 30 seconds later (18:34:13).
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    await _tick(hass, freezer, 29)
+    assert _hosts(aioclient_mock) == []
+    await _tick(hass, freezer, 1)
+    assert _hosts(aioclient_mock) == ["Monitors"]
+
+    # After that only the regular polling, five minutes on.
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    await _tick(hass, freezer, 299)
+    assert _hosts(aioclient_mock) == []
+    await _tick(hass, freezer, 1)
+    assert _hosts(aioclient_mock) == ["Monitors"]
+
+
+async def test_retry_poll_picks_up_late_report(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    freezer.move_to("2026-11-16T18:33:00+00:00")
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    entry = _entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Not reported by 18:33:43.
+    _mock_endpoints(aioclient_mock, _monitor(0))
+    await _tick(hass, freezer, 43)
+    assert _hosts(aioclient_mock) == ["Monitors"]
+
+    # Reported at 18:33:50, picked up by the retry at 18:34:13.
+    _mock_endpoints(
+        aioclient_mock, _contact("2026-11-16T18:33:50Z", "2026-11-16T18:53:50Z")
+    )
+    await _tick(hass, freezer, 30)
+    assert "Dogs" in _hosts(aioclient_mock)
+
+    # The next polls follow the new expected time, not the old one.
+    coordinator = entry.runtime_data
+    assert coordinator._contact_poll_at == dt_util.parse_datetime(
+        "2026-11-16T18:53:55+00:00"
+    )
+
 CADENCE_URL = (
     f"{LOCATION_BASE_URL}/api/user/{USER_ID}/dog/{DOG_ID}"
     "/monitor/updatePermanentCadence"

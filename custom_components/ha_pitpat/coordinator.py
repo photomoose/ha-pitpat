@@ -13,7 +13,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_point_in_utc_time,
+    async_track_time_interval,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -60,6 +64,10 @@ KEEP_ALIVE_LIMIT = timedelta(hours=3)
 # After asking the monitors to wake up, poll quickly for at most this long,
 # until each reports in.
 WAKE_UP_POLL = timedelta(minutes=3)
+# Poll this long after a monitor is next expected to report, to pick the report
+# up straight away rather than at the next regular poll; then once more, 30
+# seconds later, if it hasn't reported by then.
+CONTACT_POLL_DELAYS = (timedelta(seconds=5), timedelta(seconds=35))
 # A report the hub hasn't pushed this long after it was sent means the
 # subscription has silently stopped working.
 LIVE_PUSH_TIMEOUT = timedelta(seconds=30)
@@ -111,6 +119,11 @@ class PitPatDogData:
         timings = self.monitor_value("ContactTimings") or {}
         return parse_datetime(timings.get("LastMessageSentAt"))
 
+    @property
+    def next_message_expected_at(self) -> datetime | None:
+        timings = self.monitor_value("ContactTimings") or {}
+        return parse_datetime(timings.get("NextMessageExpectedAt"))
+
 
 class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
     """Fetches all dogs with their monitor and activity; keyed by dog id."""
@@ -151,6 +164,9 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         # and until when (monotonic) to poll quickly for their reports.
         self._wake_up_reported_before: dict[str, datetime | None] = {}
         self._wake_up_until = 0.0
+        # A one-off poll just after the next report is expected.
+        self._contact_poll_at: datetime | None = None
+        self._unsub_contact_poll: CALLBACK_TYPE | None = None
 
     @callback
     def async_expect_live_tracking(self) -> None:
@@ -268,7 +284,49 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
     @callback
     def async_update_listeners(self) -> None:
         self._async_update_live_connection()
+        self._async_schedule_contact_poll()
         super().async_update_listeners()
+
+    @callback
+    def _async_schedule_contact_poll(self) -> None:
+        """Poll just after the next report is expected, and again if it's late.
+
+        On top of the regular polling, which carries on as before. Dogs being
+        live tracked are left out: they report every few seconds. Once a dog
+        reports, its expected time moves on, and with it the polls. A collar
+        that misses both is left to the regular polling.
+        """
+        now = dt_util.utcnow()
+        due = [
+            when
+            for dog_data in (self.data or {}).values()
+            if not dog_data.live_tracking
+            and (expected := dog_data.next_message_expected_at) is not None
+            for delay in CONTACT_POLL_DELAYS
+            if (when := expected + delay) > now
+        ]
+        when = min(due, default=None)
+        if when == self._contact_poll_at:
+            return
+        self._async_cancel_contact_poll()
+        if when is not None:
+            self._contact_poll_at = when
+            self._unsub_contact_poll = async_track_point_in_utc_time(
+                self.hass, self._async_contact_poll, when
+            )
+
+    @callback
+    def _async_cancel_contact_poll(self) -> None:
+        if self._unsub_contact_poll is not None:
+            self._unsub_contact_poll()
+            self._unsub_contact_poll = None
+        self._contact_poll_at = None
+
+    async def _async_contact_poll(self, _now: datetime) -> None:
+        self._unsub_contact_poll = None
+        self._contact_poll_at = None
+        _LOGGER.debug("Polling for the expected report")
+        await self.async_request_refresh()
 
     def _live_tracked_dogs(self) -> set[str]:
         return {
@@ -349,6 +407,7 @@ class PitPatCoordinator(DataUpdateCoordinator[dict[str, PitPatDogData]]):
         await self.async_request_refresh()
 
     async def async_shutdown(self) -> None:
+        self._async_cancel_contact_poll()
         if self._unsub_live_reconnect:
             self._unsub_live_reconnect()
             self._unsub_live_reconnect = None
