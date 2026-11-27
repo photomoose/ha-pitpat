@@ -112,7 +112,7 @@ class PitPatLiveConnection:
             TypeError,
             ValueError,
         ) as err:
-            raise PitPatConnectionError(f"Could not connect: {err!r}") from err
+            raise PitPatConnectionError(f"Could not connect: {_describe(err)}") from err
         if handshake.get("error"):
             raise PitPatConnectionError(f"Handshake failed: {handshake['error']}")
 
@@ -189,7 +189,7 @@ class PitPatLiveConnection:
                 json.dumps(message, separators=(",", ":")) + RECORD_SEPARATOR
             )
         except (aiohttp.ClientError, ConnectionError) as err:
-            raise PitPatConnectionError(f"Send failed: {err!r}") from err
+            raise PitPatConnectionError(f"Send failed: {_describe(err)}") from err
 
     def _handle(self, data: str) -> None:
         for record in data.split(RECORD_SEPARATOR):
@@ -215,3 +215,16 @@ class PitPatLiveConnection:
                 raise PitPatConnectionError(
                     f"Closed by the hub: {message.get('error')}"
                 )
+
+
+def _describe(err: BaseException) -> str:
+    """Describe an error without its request details.
+
+    The repr of a ClientResponseError (and WSServerHandshakeError) carries the
+    request headers, which include the hub's access token.
+    """
+    if isinstance(err, aiohttp.ClientResponseError):
+        return f"{type(err).__name__} {err.status} {err.message}"
+    if detail := str(err):
+        return f"{type(err).__name__}: {detail}"
+    return type(err).__name__

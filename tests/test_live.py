@@ -34,6 +34,7 @@ class FakeHub:
         self.received: list[dict] = []
         self.ws: web.WebSocketResponse | None = None
         self.subscribed = asyncio.Event()
+        self.reject_negotiate = False
         self.app = web.Application()
         self.app.router.add_post("/client/negotiate", self.negotiate)
         self.app.router.add_get("/client/", self.websocket)
@@ -42,6 +43,8 @@ class FakeHub:
         self.requests.append(
             ("negotiate", request.rel_url.raw_query_string, request.headers.get("Authorization"))
         )
+        if self.reject_negotiate:
+            return web.Response(status=401, text="Unauthorized")
         return web.json_response(
             {"negotiateVersion": 1, "connectionId": "cid", "connectionToken": "c/t"}
         )
@@ -202,3 +205,12 @@ async def test_bad_negotiate_response(session) -> None:
     connection = PitPatLiveConnection(session, client, USER_ID, lambda *_: None)
     with pytest.raises(PitPatConnectionError, match="negotiate"):
         await connection.async_connect()
+
+
+async def test_rejected_negotiate_keeps_token_out_of_error(hub: FakeHub, session) -> None:
+    hub.reject_negotiate = True
+    connection = PitPatLiveConnection(session, _client(hub), USER_ID, lambda *_: None)
+    with pytest.raises(PitPatConnectionError) as exc_info:
+        await connection.async_connect()
+    assert str(exc_info.value) == "Could not connect: ClientResponseError 401 Unauthorized"
+    assert "hub-token" not in str(exc_info.value)
